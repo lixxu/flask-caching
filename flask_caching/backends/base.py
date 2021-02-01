@@ -11,6 +11,11 @@
     :license: BSD, see LICENSE for more details.
 """
 
+try:
+    import cPickle as pickle
+except ImportError:  # pragma: no cover
+    import pickle  # type: ignore
+
 
 def iteritems_wrapper(mappingorseq):
     """Wrapper for efficient iteration over mappings represented by dicts
@@ -28,7 +33,21 @@ def iteritems_wrapper(mappingorseq):
     return mappingorseq
 
 
-class BaseCache(object):
+class PickleBase(object):
+    @property
+    def pickle_protocol(self):
+        return self._pickle_protocol or pickle.HIGHEST_PROTOCOL
+
+    def pickle_dump(self, *args, **kwargs):
+        kwargs.setdefault("protocol", self.pickle_protocol)
+        pickle.dump(*args, **kwargs)
+
+    def pickle_dumps(self, *args, **kwargs):
+        kwargs.setdefault("protocol", self.pickle_protocol)
+        return pickle.dumps(*args, **kwargs)
+
+
+class BaseCache(PickleBase):
     """Baseclass for the cache systems.  All the cache systems implement this
     API or a superset of it.
 
@@ -37,9 +56,10 @@ class BaseCache(object):
                             of 0 indicates that the cache never expires.
     """
 
-    def __init__(self, default_timeout=300):
+    def __init__(self, default_timeout=300, pickle_protocol=None):
         self.default_timeout = default_timeout
         self.ignore_errors = False
+        self._pickle_protocol = pickle_protocol
 
     def _normalize_timeout(self, timeout):
         if timeout is None:

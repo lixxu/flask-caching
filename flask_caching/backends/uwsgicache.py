@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
 
 
 class UWSGICache(BaseCache):
-    """ Implements the cache using uWSGI's caching framework.
+    """Implements the cache using uWSGI's caching framework.
 
     .. note::
         This class cannot be used when running under PyPy, because the uWSGI
@@ -34,8 +34,11 @@ class UWSGICache(BaseCache):
         you only have to provide the name of the cache.
     """
 
-    def __init__(self, default_timeout=300, cache=""):
-        super(UWSGICache, self).__init__(default_timeout)
+    def __init__(self, default_timeout=300, cache="", **kwargs):
+        super(UWSGICache, self).__init__(
+            default_timeout,
+            pickle_protocol=kwargs.pop("pickle_protocol", None),
+        )
 
         if platform.python_implementation() == "PyPy":
             raise RuntimeError(
@@ -45,16 +48,18 @@ class UWSGICache(BaseCache):
 
         try:
             import uwsgi
+
             self._uwsgi = uwsgi
         except ImportError:
             raise RuntimeError(
                 "uWSGI could not be imported, are you running under uWSGI?"
             )
 
-        if 'cache2' not in uwsgi.opt:
+        if "cache2" not in uwsgi.opt:
             raise RuntimeError(
                 "You must enable cache2 in uWSGI configuration: "
-                "https://uwsgi-docs.readthedocs.io/en/latest/Caching.html")
+                "https://uwsgi-docs.readthedocs.io/en/latest/Caching.html"
+            )
 
         self.cache = cache
 
@@ -70,7 +75,7 @@ class UWSGICache(BaseCache):
     def set(self, key, value, timeout=None):
         return self._uwsgi.cache_update(
             key,
-            pickle.dumps(value),
+            self.pickle_dumps(value),
             self._normalize_timeout(timeout),
             self.cache,
         )
@@ -78,7 +83,7 @@ class UWSGICache(BaseCache):
     def add(self, key, value, timeout=None):
         return self._uwsgi.cache_set(
             key,
-            pickle.dumps(value),
+            self.pickle_dumps(value),
             self._normalize_timeout(timeout),
             self.cache,
         )

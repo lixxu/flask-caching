@@ -49,7 +49,10 @@ class RedisCache(BaseCache):
         key_prefix=None,
         **kwargs
     ):
-        super().__init__(default_timeout)
+        super().__init__(
+            default_timeout,
+            pickle_protocol=kwargs.pop("pickle_protocol", None),
+        )
         if host is None:
             raise ValueError("RedisCache host parameter may not be None")
         if isinstance(host, str):
@@ -90,7 +93,7 @@ class RedisCache(BaseCache):
         t = type(value)
         if t == int:
             return str(value).encode("ascii")
-        return b"!" + pickle.dumps(value)
+        return b"!" + self.pickle_dumps(value)
 
     def load_object(self, value):
         """The reversal of :meth:`dump_object`.  This might be called with
@@ -191,8 +194,7 @@ class RedisCache(BaseCache):
         )
 
     def unlink(self, *keys):
-        """when redis-py >= 3.0.0 and redis > 4, support this operation
-        """
+        """when redis-py >= 3.0.0 and redis > 4, support this operation"""
         if not keys:
             return
         if self.key_prefix:
@@ -273,7 +275,8 @@ class RedisSentinelCache(RedisCache):
         self._read_clients = sentinel.slave_for(master)
 
         self.key_prefix = key_prefix or ""
-        
+
+
 class RedisClusterCache(RedisCache):
     """Uses the Redis key-value store as a cache backend.
 
@@ -295,17 +298,21 @@ class RedisClusterCache(RedisCache):
     Any additional keyword arguments will be passed to
     ``rediscluster.RedisCluster``.
     """
-    def __init__(self,
-                 cluster="",
-                 password="",
-                 default_timeout=300,
-                 key_prefix="",
-                 **kwargs):
+
+    def __init__(
+        self,
+        cluster="",
+        password="",
+        default_timeout=300,
+        key_prefix="",
+        **kwargs
+    ):
         super().__init__(default_timeout=default_timeout)
 
         if kwargs.get("decode_responses", None):
-            raise ValueError("decode_responses is not supported by "
-                             "RedisCache.")
+            raise ValueError(
+                "decode_responses is not supported by " "RedisCache."
+            )
 
         try:
             from rediscluster import RedisCluster
@@ -313,21 +320,25 @@ class RedisClusterCache(RedisCache):
             raise RuntimeError("no rediscluster module found")
 
         try:
-            nodes = [(node.split(':')) for node in cluster.split(',')]
-            startup_nodes = [{
-                'host': node[0].strip(),
-                'port': node[1].strip()
-            } for node in nodes]
+            nodes = [(node.split(":")) for node in cluster.split(",")]
+            startup_nodes = [
+                {"host": node[0].strip(), "port": node[1].strip()}
+                for node in nodes
+            ]
         except IndexError:
-            raise ValueError("Please give the correct cluster argument "
-                             "e.g. host1:port1,host2:port2,host3:port3")
+            raise ValueError(
+                "Please give the correct cluster argument "
+                "e.g. host1:port1,host2:port2,host3:port3"
+            )
         # Skips the check of cluster-require-full-coverage config,
         # useful for clusters without the CONFIG command (like aws)
-        skip_full_coverage_check = kwargs.pop('skip_full_coverage_check', True)
-        
-        cluster = RedisCluster(startup_nodes=startup_nodes,
-                               password=password,
-                               skip_full_coverage_check=skip_full_coverage_check,
-                               **kwargs)
+        skip_full_coverage_check = kwargs.pop("skip_full_coverage_check", True)
+
+        cluster = RedisCluster(
+            startup_nodes=startup_nodes,
+            password=password,
+            skip_full_coverage_check=skip_full_coverage_check,
+            **kwargs
+        )
         self._write_client = self._read_clients = cluster
         self.key_prefix = key_prefix

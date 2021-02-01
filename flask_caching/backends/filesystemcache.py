@@ -64,8 +64,12 @@ class FileSystemCache(BaseCache):
         mode=0o600,
         hash_method=hashlib.md5,
         ignore_errors=False,
+        **kwargs
     ):
-        super(FileSystemCache, self).__init__(default_timeout)
+        super(FileSystemCache, self).__init__(
+            default_timeout,
+            pickle_protocol=kwargs.pop("pickle_protocol", None),
+        )
         self._path = cache_dir
         self._threshold = threshold
         self._mode = mode
@@ -105,8 +109,7 @@ class FileSystemCache(BaseCache):
         return int(timeout)
 
     def _list_dir(self):
-        """return a list of (fully qualified) cache filenames
-        """
+        """return a list of (fully qualified) cache filenames"""
         mgmt_files = [
             self._get_filename(name).split("/")[-1]
             for name in (self._fs_count_file,)
@@ -133,7 +136,7 @@ class FileSystemCache(BaseCache):
                 remove = (expires != 0 and expires <= now) or idx % 3 == 0
                 if remove:
                     os.remove(fname)
-                    nremoved +=1
+                    nremoved += 1
             except (IOError, OSError):
                 pass
         self._update_count(value=len(self._list_dir()))
@@ -206,7 +209,7 @@ class FileSystemCache(BaseCache):
             )
             with os.fdopen(fd, "wb") as f:
                 pickle.dump(timeout, f, 1)
-                pickle.dump(value, f, pickle.HIGHEST_PROTOCOL)
+                self.pickle_dump(value, f)
             is_new_file = not os.path.exists(filename)
             os.replace(tmp, filename)
             os.chmod(filename, self._mode)

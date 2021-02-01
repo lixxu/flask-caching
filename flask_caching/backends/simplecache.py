@@ -41,8 +41,13 @@ class SimpleCache(BaseCache):
                           ``False``.
     """
 
-    def __init__(self, threshold=500, default_timeout=300, ignore_errors=False):
-        super(SimpleCache, self).__init__(default_timeout)
+    def __init__(
+        self, threshold=500, default_timeout=300, ignore_errors=False, **kwargs
+    ):
+        super(SimpleCache, self).__init__(
+            default_timeout,
+            pickle_protocol=kwargs.pop("pickle_protocol", None),
+        )
         self._cache = {}
         self.clear = self._cache.clear
         self._threshold = threshold
@@ -88,7 +93,7 @@ class SimpleCache(BaseCache):
     def set(self, key, value, timeout=None):
         expires = self._normalize_timeout(timeout)
         self._prune()
-        item = (expires, pickle.dumps(value, pickle.HIGHEST_PROTOCOL))
+        item = (expires, self.pickle_dumps(value))
         self._cache[key] = item
         logger.debug("set key %r", key)
         return True
@@ -96,7 +101,7 @@ class SimpleCache(BaseCache):
     def add(self, key, value, timeout=None):
         expires = self._normalize_timeout(timeout)
         self._prune()
-        item = (expires, pickle.dumps(value, pickle.HIGHEST_PROTOCOL))
+        item = (expires, self.pickle_dumps(value))
         updated = False
         should_add = key not in self._cache
         if should_add:

@@ -60,8 +60,13 @@ class MemcachedCache(BaseCache):
                        different prefix.
     """
 
-    def __init__(self, servers=None, default_timeout=300, key_prefix=None):
-        super(MemcachedCache, self).__init__(default_timeout)
+    def __init__(
+        self, servers=None, default_timeout=300, key_prefix=None, **kwargs
+    ):
+        super(MemcachedCache, self).__init__(
+            default_timeout,
+            pickle_protocol=kwargs.pop("pickle_protocol", None),
+        )
         if servers is None or isinstance(servers, (list, tuple)):
             if servers is None:
                 servers = ["127.0.0.1:11211"]
@@ -86,15 +91,15 @@ class MemcachedCache(BaseCache):
         if timeout > 0:
             # NOTE: pylibmc expect the timeout as delta time up to
             # 2592000 seconds (30 days)
-            if not hasattr(self, 'mc_library'):
+            if not hasattr(self, "mc_library"):
                 try:
                     import pylibmc
                 except ImportError:
                     self.mc_library = None
                 else:
-                    self.mc_library = 'pylibmc'
+                    self.mc_library = "pylibmc"
 
-            if self.mc_library != 'pylibmc':
+            if self.mc_library != "pylibmc":
                 timeout = int(time()) + timeout
             elif timeout > 2592000:
                 timeout = 0
@@ -195,7 +200,7 @@ class MemcachedCache(BaseCache):
         except ImportError:
             pass
         else:
-            self.mc_library = 'pylibmc'
+            self.mc_library = "pylibmc"
             return pylibmc.Client(servers)
 
         try:
@@ -203,7 +208,7 @@ class MemcachedCache(BaseCache):
         except ImportError:
             pass
         else:
-            self.mc_library = 'google.appengine.api'
+            self.mc_library = "google.appengine.api"
             return memcache.Client()
 
         try:
@@ -211,7 +216,7 @@ class MemcachedCache(BaseCache):
         except ImportError:
             pass
         else:
-            self.mc_library = 'memcache'
+            self.mc_library = "memcache"
             return memcache.Client(servers)
 
         try:
@@ -219,7 +224,7 @@ class MemcachedCache(BaseCache):
         except ImportError:
             pass
         else:
-            self.mc_library = 'libmc'
+            self.mc_library = "libmc"
             return libmc.Client(servers)
 
 
@@ -233,7 +238,9 @@ class SASLMemcachedCache(MemcachedCache):
         password=None,
         **kwargs
     ):
-        super(SASLMemcachedCache, self).__init__(default_timeout=default_timeout)
+        super(SASLMemcachedCache, self).__init__(
+            default_timeout=default_timeout
+        )
 
         if servers is None:
             servers = ["127.0.0.1:11211"]
@@ -241,7 +248,11 @@ class SASLMemcachedCache(MemcachedCache):
         import pylibmc
 
         self._client = pylibmc.Client(
-            servers, username=username, password=password, binary=True, **kwargs
+            servers,
+            username=username,
+            password=password,
+            binary=True,
+            **kwargs
         )
 
         self.key_prefix = key_prefix
@@ -294,7 +305,7 @@ class SpreadSASLMemcachedCache(SASLMemcachedCache):
         # I didn't found a good way to avoid pickling/unpickling if
         # key is smaller than chunksize, because in case or <werkzeug.requests>
         # getting the length consume the data iterator.
-        serialized = pickle.dumps(value, 2)
+        serialized = self.pickle_dumps(value, 2)
         values = {}
         len_ser = len(serialized)
         chks = range(0, len_ser, self.chunksize)
